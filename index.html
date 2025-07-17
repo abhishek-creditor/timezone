@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>User Local Time</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 2em; }
+    .time-box { background: #f5f5f5; padding: 1em; border-radius: 8px; display: inline-block; }
+    h1 { color: #333; }
+    .location { margin-top: 1em; }
+    .error { color: red; }
+    .spinner { margin: 1em 0; text-align: center; }
+    .lds-dual-ring {
+      display: inline-block;
+      width: 40px;
+      height: 40px;
+    }
+    .lds-dual-ring:after {
+      content: " ";
+      display: block;
+      width: 32px;
+      height: 32px;
+      margin: 4px;
+      border-radius: 50%;
+      border: 4px solid #888;
+      border-color: #888 transparent #888 transparent;
+      animation: lds-dual-ring 1.2s linear infinite;
+    }
+    @keyframes lds-dual-ring {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    .hidden { display: none; }
+  </style>
+</head>
+<body>
+  <h1>Your Local Time</h1>
+  <div class="time-box">
+    <div id="spinner" class="spinner">
+      <div class="lds-dual-ring"></div>
+      <div>Loading your location and local time...</div>
+    </div>
+    <div id="timezone"></div>
+    <div id="locale" class="hidden"></div>
+    <div id="localtime" class="hidden"></div>
+    <div class="location">
+      <div id="coords"></div>
+      <div id="address"></div>
+      <div id="geo-error" class="error"></div>
+    </div>
+    <div id="utc-time" style="margin-top:1em;"></div>
+  </div>
+  <script>
+    const userLocale = navigator.language;
+    const userTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    const now = new Date();
+    document.getElementById('timezone').textContent = `Time Zone: ${userTimeZone}`;
+    document.getElementById('utc-time').textContent = `UTC Time: ${now.toUTCString()}`;
+
+    // Map countries to locales
+    function getLocaleForCountry(country) {
+      const map = {
+        'India': 'en-IN',
+        'United States': 'en-US',
+        'France': 'fr-FR',
+        'Germany': 'de-DE',
+        'Japan': 'ja-JP',
+        'China': 'zh-CN',
+        'United Kingdom': 'en-GB',
+        'Canada': 'en-CA',
+        'Australia': 'en-AU',
+        'Russia': 'ru-RU',
+        'Brazil': 'pt-BR',
+        'Spain': 'es-ES',
+        'Italy': 'it-IT',
+        'Mexico': 'es-MX',
+        // Add more as needed
+      };
+      return map[country] || userLocale;
+    }
+
+    // Show spinner until locale is inferred
+    function showSpinner(show) {
+      document.getElementById('spinner').classList.toggle('hidden', !show);
+      document.getElementById('locale').classList.toggle('hidden', show);
+      document.getElementById('localtime').classList.toggle('hidden', show);
+    }
+    showSpinner(true);
+
+    // Geolocation and reverse geocoding
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        position => {
+          const lat = position.coords.latitude;
+          const lon = position.coords.longitude;
+          document.getElementById('coords').textContent = `Coordinates: ${lat.toFixed(4)}, ${lon.toFixed(4)}`;
+          fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}`)
+            .then(response => response.json())
+            .then(data => {
+              const address = data.address;
+              let locationStr = '';
+              if (address.city) locationStr += address.city + ', ';
+              else if (address.town) locationStr += address.town + ', ';
+              else if (address.village) locationStr += address.village + ', ';
+              if (address.state) locationStr += address.state + ', ';
+              if (address.country) locationStr += address.country;
+              document.getElementById('address').textContent = `Location: ${locationStr}`;
+
+              // Infer locale from country
+              const inferredLocale = getLocaleForCountry(address.country);
+              document.getElementById('locale').textContent = `Locale: ${inferredLocale}`;
+              document.getElementById('localtime').textContent = `Local Time: ${now.toLocaleString(inferredLocale, { timeZone: userTimeZone })}`;
+              showSpinner(false);
+            })
+            .catch(() => {
+              document.getElementById('address').textContent = 'Unable to retrieve address.';
+              showSpinner(false);
+            });
+        },
+        error => {
+          document.getElementById('geo-error').textContent = 'Geolocation permission denied or unavailable.';
+          showSpinner(false);
+        }
+      );
+    } else {
+      document.getElementById('geo-error').textContent = 'Geolocation is not supported by your browser.';
+      showSpinner(false);
+    }
+  </script>
+</body>
+</html> 
